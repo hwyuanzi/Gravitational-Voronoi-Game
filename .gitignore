@@ -6,6 +6,9 @@ bots.local.json
 bots/*/
 !bots/samples/
 !bots/templates/
+!bots/haowen/
+bots/haowen/*
+!bots/haowen/bot.cpp
 bots/samples/*/bot
 bots/samples/*/bot.exe
 bots/templates/*/bot

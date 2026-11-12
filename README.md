@@ -36,7 +36,18 @@ Open **http://127.0.0.1:8093** in your browser. Stop the server with **Ctrl+C**.
 (On Windows, type `python` instead of `python3`.)
 
 Press **Every pair** (or **Melee of every bot**), then **Start tournament**, and the sample bots
-play each other while you watch.
+and contest entry play each other while you watch.
+
+## Contest entry
+
+The submission is [`bots/haowen/bot.cpp`](bots/haowen/bot.cpp). The referee discovers it as
+`haowen` and compiles it with its default C++17 build. Run a pairing and verify its results
+from the repository root.
+
+```sh
+python3 start.py match haowen "Greedy (Python)" --config params/s10_w100.txt --no-browser
+python3 start.py verify results/match/results.json
+```
 
 ---
 
@@ -56,8 +67,8 @@ Press **Rescan** on the dashboard and they appear, named after their folders. C+
 compiled before any clock starts; Julia bots need `julia` on the PATH.
 
 To give a bot a nicer name or a different command, list it in `bots.local.json` (same format as
-`bots.json`). Both `bots.local.json` and everything in `bots/` except the samples and templates
-are ignored by git, so players' code never gets committed by accident.
+`bots.json`). Git tracks the samples, templates, and contest submission. It ignores
+`bots.local.json` and folders for other players' bots.
 
 ---
 

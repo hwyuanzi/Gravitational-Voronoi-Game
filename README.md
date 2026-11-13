@@ -40,9 +40,10 @@ and contest entry play each other while you watch.
 
 ## Contest entry
 
-The submission is [`bots/haowen/bot.cpp`](bots/haowen/bot.cpp). The referee discovers it as
-`haowen` and compiles it with its default C++17 build. Run a pairing and verify its results
-from the repository root.
+The submission is [`bots/haowen/bot.py`](bots/haowen/bot.py). It runs on Python 3.8+ with
+only the standard library. The referee discovers it as `haowen`. The original
+[`bot.cpp`](bots/haowen/bot.cpp) is kept for comparison. Run a pairing and verify its
+results from the repository root.
 
 ```sh
 python3 start.py match haowen "Greedy (Python)" --config params/s10_w100.txt --no-browser

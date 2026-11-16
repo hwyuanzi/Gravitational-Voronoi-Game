@@ -40,13 +40,13 @@ and contest entry play each other while you watch.
 
 ## Contest entry
 
-The submission is [`bots/haowen/bot.py`](bots/haowen/bot.py). It runs on Python 3.8+ with
-only the standard library. The referee discovers it as `haowen`. The original
-[`bot.cpp`](bots/haowen/bot.cpp) is kept for comparison. Run a pairing and verify its
-results from the repository root.
+The referee discovers [`bots/haowen/`](bots/haowen/) as `haowen` and builds it with a
+C++17 compiler. Run a four-player, single-game match and verify the result from the
+repository root.
 
 ```sh
-python3 start.py match haowen "Greedy (Python)" --config params/s10_w100.txt --no-browser
+python3 start.py match haowen "Greedy (Python)" "Spread (Python)" "Random (C++)" \
+  --config params/s20_w1000.txt --one-game --no-browser
 python3 start.py verify results/match/results.json
 ```
 
@@ -108,9 +108,9 @@ by point against exact fractions.
 bot's score is its territory over both games added together, as the spec says. A melee does the
 same with more bots: one game per bot, the seating rotating so every bot sits in every seat
 exactly once (including the last seat, which places the last stone). The highest total wins.
-A match can instead be set to **one game** (on its dashboard row, or `--one-game` on the
-command line): the bots play once, in the order listed, so the first bot moves first, and the
-score is that game's territory. Use it for quick tests; it is not the spec's scoring.
+A match can be set to **one game** (on its dashboard row, or `--one-game` on the
+command line). The bots play once in the order listed, and that game's territory determines
+the winner. This is the format for the in-class four-player matches.
 Each bot keeps one colour for the whole match, whichever seat it is in: the first bot named
 is red, the second blue, and so on, so you can follow a bot from game to game.
 

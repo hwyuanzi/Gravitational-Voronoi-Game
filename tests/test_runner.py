@@ -170,6 +170,10 @@ class Matches(unittest.TestCase):
         st = play_match(bots, make_config(2, 4), clock=20, out_dir=out, game_factory=small)
         seats = [g['seats'] for g in st['games']]
         self.assertEqual(seats, [['a', 'b', 'c'], ['b', 'c', 'a'], ['c', 'a', 'b']])
+        # each bot keeps its colour whichever seat it is in: a red, b blue, c green
+        for g in st['games']:
+            self.assertEqual(dict(zip(g['seats'], g['colors'])),
+                             {'a': 'red', 'b': 'blue', 'c': 'green'})
         totals = {n: 0 for n in 'abc'}
         for g in st['games']:
             for n, s in zip(g['seats'], g['scores']):
@@ -178,6 +182,16 @@ class Matches(unittest.TestCase):
         for f in ('results.json', 'replay.html', 'log.txt'):
             self.assertTrue((out / f).is_file(), f)
         self.assertNotIn('/* REPLAY_DATA */ null', (out / 'replay.html').read_text())
+
+    def test_one_game_plays_once_in_the_order_given(self):
+        bots = [self.bot(n) for n in ('a', 'b', 'c')]
+        st = play_match(bots, make_config(2, 4), clock=20, game_factory=small, one_game=True)
+        self.assertEqual(len(st['games']), 1)
+        self.assertEqual(st['games'][0]['seats'], ['a', 'b', 'c'])
+        self.assertEqual(st['status'], 'Finished')
+        self.assertEqual(st['summary']['totals'],
+                         dict(zip(['a', 'b', 'c'], st['games'][0]['scores'])))
+        self.assertTrue(st['one_game'])
 
     def test_discovery_finds_a_dropped_in_folder(self):
         root = Path(self.dir.name)

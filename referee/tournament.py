@@ -46,7 +46,7 @@ def pairing_result(state):
     """The fields the results table needs from one finished match."""
     s = state['summary']
     return {'totals': s['totals'], 'winner': s['winner'], 'games': s['games'],
-            'params': state['params']}
+            'params': state['params'], 'one_game': state.get('one_game', False)}
 
 
 def build_all(bots):
@@ -69,6 +69,8 @@ def main():
     ap.add_argument('--registry', default='bots.json')
     ap.add_argument('--config', help='use this one parameter file for every match')
     ap.add_argument('--clock', type=float, default=120, help='seconds per bot per game')
+    ap.add_argument('--one-game', action='store_true',
+                    help='every match is one game, the first bot named moving first')
     ap.add_argument('--output', default='results/tournament')
     args = ap.parse_args()
 
@@ -93,7 +95,7 @@ def main():
         config = files[i % len(files)]
         print(f'[{i + 1}/{len(groups)}] {" vs ".join(group)} ({Path(config).name})', flush=True)
         state = play_match([roster[n] for n in group], config, args.clock, out / f'{i + 1:02d}',
-                           echo=True)
+                           echo=True, one_game=args.one_game)
         entry = {'bots': list(group), 'config': config}
         entry.update(pairing_result(state))
         tot = entry['totals']

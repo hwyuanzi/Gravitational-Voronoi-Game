@@ -68,6 +68,7 @@
   .pairing .seat { display: flex; align-items: center; gap: 4px; }
   .pairing .dot { width: 10px; height: 10px; border-radius: 50%; }
   .pairing .grow { flex: 1; }
+  select.games { font-size: 12px; padding: 4px 7px; color: var(--dim); }
   .kind { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-radius: 99px;
           padding: 1px 8px; }
 
@@ -131,10 +132,12 @@
     <h2><span class="n">3</span> Matches</h2>
     <div class="body">
       <p class="hint">A match between two bots is two games with the same parameters: each bot moves
-        first once (<b style="color:var(--red)">red</b> moves first, <b style="color:var(--blue)">blue</b>
-        places the last stone). A bot's score is its territory over both games added together.
+        first once. Each bot keeps its colour for the whole match: the first bot in the row is
+        <b style="color:var(--red)">red</b>, the second <b style="color:var(--blue)">blue</b>, and so on.
+        A bot's score is its territory over both games added together.
         A <b>melee</b> is the same with more bots: one game per bot, the seats rotating so every bot
-        sits in every seat once. An illegal stone skips that turn and is logged.</p>
+        sits in every seat once. To play just one game instead, choose <b>1 game</b> on the row:
+        the first bot in the row moves first. An illegal stone skips that turn and is logged.</p>
       <div id="pairings"></div>
       <div class="row" style="margin-top:12px">
         <button id="addpair">Add pairing</button>
@@ -246,16 +249,23 @@ function drawPairs() {
           ${p.bots.length > 2 ? `<button class="mini" data-drop="${i}" data-j="${j}" title="remove this bot">−</button>` : ''}
         </span>`).join('')}
       ${p.bots.length < setup.max_players ? `<button class="mini" data-more="${i}" title="add a bot: makes this a melee">+ bot</button>` : ''}
-      <span class="kind">${p.bots.length === 2 ? 'pairing · 2 games' : `melee · ${p.bots.length} games`}</span>
+      <span class="kind">${p.bots.length === 2 ? 'pairing' : 'melee'}</span>
+      <select class="games" data-one="${i}" title="Every bot moves first once, or a single game">
+        <option value="" ${p.one_game ? '' : 'selected'}>${p.bots.length} games, each bot first once</option>
+        <option value="1" ${p.one_game ? 'selected' : ''}>1 game, ${esc(p.bots[0])} first</option>
+      </select>
       <span class="grow"></span>
       <select data-i="${i}" data-k="config">${paramOptions(p.config)}</select>
       <button data-del="${i}" title="remove this match">✕</button>
     </div>`).join('') || '<p class="hint">No matches yet. You need at least two bots.</p>';
   $('pairings').querySelectorAll('select[data-j]').forEach(s => {
-    s.onchange = e => { pairs[+e.target.dataset.i].bots[+e.target.dataset.j] = e.target.value; };
+    s.onchange = e => { pairs[+e.target.dataset.i].bots[+e.target.dataset.j] = e.target.value; drawPairs(); };
   });
   $('pairings').querySelectorAll('select[data-k]').forEach(s => {
     s.onchange = e => { pairs[+e.target.dataset.i].config = e.target.value; };
+  });
+  $('pairings').querySelectorAll('select[data-one]').forEach(s => {
+    s.onchange = e => { pairs[+e.target.dataset.one].one_game = e.target.value === '1'; };
   });
   $('pairings').querySelectorAll('[data-del]').forEach(b => {
     b.onclick = e => { pairs.splice(+e.target.dataset.del, 1); drawPairs(); };
@@ -317,13 +327,19 @@ $('pace').onchange = () => post('/api/pace', {pace: +$('pace').value}).catch(() 
 
 // ---------------------------------------------------------------- results
 
+/** Which colour a seat had in a game: its bot's colour, or the seat's for older results. */
+function colorIx(g, seat) {
+  const ix = g.colors ? setup.colors.indexOf(g.colors[seat]) : -1;
+  return ix >= 0 ? ix : seat % UI.length;
+}
+
 /** One game's scores in seat order, each with its seat colour; the game's winner in gold. */
 function gameCell(g) {
   if (!g || !g.scores) return '<span class="dim">–</span>';
   const best = Math.max(...g.scores);
   const lone = g.scores.filter(s => s === best).length === 1;
   return '<div class="g">' + g.seats.map((n, s) =>
-    `<span class="sw" style="background:${UI[s % UI.length]}"></span>` +
+    `<span class="sw" style="background:${UI[colorIx(g, s)]}"></span>` +
     `<span class="${lone && g.scores[s] === best ? 'w' : ''}" title="${esc(n)}">${fmt(g.scores[s])}</span>`
   ).join(' · ') + '</div>';
 }
@@ -331,12 +347,13 @@ function gameCell(g) {
 function drawResults(st) {
   const rows = st.pairings || [];
   const body = $('results').querySelector('tbody');
-  body.innerHTML = ['<tr><th>Match</th><th>Parameters</th><th>Games (seat order: red first)</th>' +
+  body.innerHTML = ['<tr><th>Match</th><th>Parameters</th><th>Games (in move order)</th>' +
                     '<th class="num">Total</th><th>Winner</th><th></th></tr>']
     .concat(rows.map((p, i) => {
       const who = p.bots.map(esc).join(' <span class="dim">vs</span> ');
-      const cfg = p.config ? p.config.replace(/^params\//, '').replace(/\.txt$/, '')
-                           : (p.params ? `${p.params.stones} stones, ${p.params.weight} weight` : '');
+      const cfg = (p.config ? p.config.replace(/^params\//, '').replace(/\.txt$/, '')
+                            : (p.params ? `${p.params.stones} stones, ${p.params.weight} weight` : '')) +
+                  (p.one_game ? ' · 1 game' : '');
       if (p.error) return `<tr><td>${who}</td><td>${esc(cfg)}</td><td colspan="4" class="err">${esc(p.error)}</td></tr>`;
       if (!p.totals) {
         const now = st.current === i ? '<span class="pill">playing…</span>' : '<span class="pill">queued</span>';

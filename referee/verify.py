@@ -93,8 +93,10 @@ def verify(path, skip_recount=False):
     if (grid, min_dist) != (GRID, MIN_DIST):
         print(f'  note: this match was not played on the spec board ({GRID}, {MIN_DIST})')
 
-    # 1. rotation
-    r.check(1, len(games) == k, f'{len(games)} games for {k} bots')
+    # 1. rotation (or a single game in the order the bots were named)
+    one = st.get('one_game', False)
+    r.check(1, len(games) == (1 if one else k), f'{len(games)} games for {k} bots'
+                                                 f"{' (one-game match)' if one else ''}")
     for i, g in enumerate(games):
         want = [names[(i + s) % k] for s in range(k)]
         r.check(1, g['seats'] == want, f"game {g['game']}: seats {g['seats']}, expected {want}")
@@ -172,7 +174,8 @@ def verify(path, skip_recount=False):
     want = leaders[0] if len(leaders) == 1 else None
     r.check(10, summary['winner'] == want, f"winner {summary['winner']}, expected {want}")
 
-    rules = ['one game per bot, seats rotate so each bot moves first once',
+    rules = ['one game, bots seated in the order named' if one else
+             'one game per bot, seats rotate so each bot moves first once',
              'turns in seat order, stones_each turns each, last seat moves last',
              'every stone on the board at whole-number coordinates',
              f'every stone at least {min_dist} from every earlier stone',

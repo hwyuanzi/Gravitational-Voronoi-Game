@@ -121,6 +121,7 @@ class Game:
         self.turns_done = 0
         self.total_turns = players * config.stones
         self.notes = []
+        self.colors = list(COLORS[:players])     # colour of each seat; a match sets it per bot
         g = grid
         zero = bytes(8 * g)
         # pull[p][y][x], the best pull of anyone at each point, and its owner (0 = nobody).
@@ -134,7 +135,7 @@ class Game:
     def state(self):
         """The whole position, as sent to the player whose turn it is."""
         p = self.turn
-        return {'you': p + 1, 'players': self.k, 'color': COLORS[p],
+        return {'you': p + 1, 'players': self.k, 'color': self.colors[p],
                 'grid': self.grid, 'min_dist': self.min_dist,
                 'stones_each': self.cfg.stones, 'weight_each': self.cfg.weight,
                 'turn': self.placed[p] + self.skipped[p] + 1,
@@ -167,7 +168,7 @@ class Game:
         for s in self.stones:
             d2 = (s['x'] - x) ** 2 + (s['y'] - y) ** 2
             if d2 < limit:
-                whose = 'its own' if s['player'] == player else f"{COLORS[s['player']]}'s"
+                whose = 'its own' if s['player'] == player else f"{self.colors[s['player']]}'s"
                 return None, (f'({x}, {y}) is {d2 ** 0.5:.1f} from {whose} stone at '
                               f"({s['x']}, {s['y']}); stones must be at least {self.min_dist} apart")
         return (x, y, w), None

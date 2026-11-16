@@ -19,6 +19,9 @@
     padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
   }
   header h1 { font-size: 17px; margin: 0; letter-spacing: .3px; }
+  header h1 a { color: inherit; text-decoration: none; }
+  header h1 a:hover { color: var(--gold); }
+  header h1 a::before { content: "← "; color: var(--dim); font-weight: 400; }
   header .meta { color: var(--dim); font-size: 13px; }
   .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; padding: 18px 20px; }
   @media (max-width: 960px) { .wrap { grid-template-columns: 1fr; } }
@@ -48,11 +51,14 @@
   .thinking { animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
 
-  .banner { display: none; margin: 0 14px 12px; padding: 10px 14px; border-radius: 10px;
+  /* Always shown and always the same height, so the board below it never moves. Long text
+     is cut with "..." (the full reason is in the turn list and the notes). */
+  .banner { display: block; height: 62px; overflow: hidden; margin: 0 14px 12px; padding: 10px 14px; border-radius: 10px;
             border: 1px solid var(--line); background: #20242f; font-size: 14px; }
-  .banner.show { display: block; }
+  .banner > * { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .banner b { color: var(--gold); }
   .banner .sub { color: var(--dim); font-size: 12.5px; margin-top: 3px; }
+  .banner.idle b { color: var(--ink); font-weight: 600; }
   .banner.skip { border-color: var(--bad); background: #2b1d22; }
   .banner.skip b { color: var(--bad); }
 
@@ -75,7 +81,7 @@
   .step { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 92px; }
   label.small { color: var(--dim); font-size: 12px; display: flex; align-items: center; gap: 5px; }
 
-  .moves { max-height: 340px; overflow: auto; }
+  .moves { max-height: 340px; overflow: auto; position: relative; }
   .mv { display: grid; grid-template-columns: 34px 12px 1fr; gap: 8px; align-items: baseline;
         padding: 4px 14px; font-size: 13px; cursor: pointer; }
   .mv:hover { background: #22263a; }
@@ -96,7 +102,7 @@
 </head>
 <body>
 <header>
-  <h1>Gravitational Voronoi</h1>
+  <h1><a id="home" href="/" target="_top" title="Back to the dashboard">Gravitational Voronoi</a></h1>
   <span class="meta" id="meta"></span>
   <span class="meta" id="status"></span>
 </header>
@@ -177,7 +183,11 @@ let drawnStones = [];
 
 const esc = t => { const d = document.createElement('div'); d.textContent = t ?? ''; return d.innerHTML; };
 const fmt = n => (n ?? 0).toLocaleString('en-US');
-const colorOf = seat => (state && state.colors ? state.colors[seat] : COLORS[seat]) || COLORS[seat % COLORS.length];
+// The colour of each seat in the game on screen. A bot keeps one colour for the whole match,
+// so this changes from game to game as the seats rotate. Older replays without it fall back
+// to colouring by seat.
+let seatColors = null;
+const colorOf = seat => (seatColors && seatColors[seat]) || COLORS[seat % COLORS.length];
 
 // ---------------------------------------------------------------- territory
 
@@ -216,7 +226,7 @@ function territory(grid, stones, k) {
 
 /** Draw the board: the territory in light colours, then the stones, darker, on top. */
 function drawBoard(grid, stones, k, minDist, avgWeight, lastStone) {
-  const key = JSON.stringify([grid, stones, $('rings').checked, lastStone]);
+  const key = JSON.stringify([grid, stones, $('rings').checked, lastStone, seatColors]);
   if (key === lastKey) return;
   lastKey = key;
   const cv = $('board');
@@ -297,6 +307,16 @@ function subLine(seat, clock, weightLeft, skipped, error, thinking) {
   return parts.join(' · ');
 }
 
+/** The strip above the board: a title line and a detail line, at one fixed height. */
+function setBanner(kind, title, sub) {
+  const b = $('banner');
+  b.className = 'banner' + (kind ? ' ' + kind : '');
+  b.innerHTML = `<b></b><span class="sub"></span>`;
+  b.firstChild.textContent = title;
+  b.lastChild.textContent = sub || '';
+  b.title = sub || title;
+}
+
 function drawNotes(notes) {
   const box = $('notes');
   box.innerHTML = '';
@@ -328,6 +348,15 @@ function rebuild(game, upto) {
   return stones;
 }
 
+/** The tab label for a finished game: its winner and the share of the board they took. */
+function gameWinner(gs, points) {
+  const sc = gs.scores || [];
+  if (gs.status !== 'finished' || !sc.length) return 'not finished';
+  const best = Math.max(...sc);
+  if (sc.filter(v => v === best).length > 1) return `tie at ${(100 * best / points).toFixed(1)}%`;
+  return `${gs.seats[sc.indexOf(best)]} ${(100 * best / points).toFixed(1)}%`;
+}
+
 function render() {
   if (!state) return;
   const games = state.games || [];
@@ -335,15 +364,18 @@ function render() {
   const P = state.params || {};
   const k = state.players || (state.names || []).length;
   $('meta').textContent = `${P.stones} stones and ${P.weight} weight each · ${k} players · ` +
-                          `${state.time_budget}s per bot per game`;
+                          `${state.time_budget}s per bot per game` +
+                          (games.length === 1 && state.one_game ? ' · one game' : '');
   $('status').textContent = state.status || '';
 
   const tabs = $('games');
+  tabs.style.display = games.length > 1 ? '' : 'none';      // one game: nothing to switch between
+  $('banner').style.marginTop = games.length > 1 ? '' : '14px';
   if (tabs.childElementCount !== games.length) {
     tabs.innerHTML = '';
     games.forEach((gs, i) => {
       const b = document.createElement('button');
-      b.textContent = `Game ${gs.game}` + (gs.seats ? ` · ${gs.seats[0]} first` : '');
+      b.textContent = `Game ${gs.game} · ${gameWinner(gs, (state.grid || 1000) ** 2)}`;
       b.onclick = () => { gameIx = i; step = (games[i].moves || []).length; stopPlay(); render(); };
       tabs.appendChild(b);
     });
@@ -351,6 +383,7 @@ function render() {
   [...tabs.children].forEach((b, i) => b.classList.toggle('on', i === gameIx));
   if (!game) return;
 
+  seatColors = game.colors || null;
   const moves = game.moves || [];
   step = Math.max(0, Math.min(step, moves.length));
   const at = moves[step - 1];
@@ -371,22 +404,25 @@ function render() {
                  step >= moves.length && game.errors ? game.errors[seat] : null, false),
   })));
 
-  const banner = $('banner');
   if (at && at.refused) {
-    banner.className = 'banner show skip';
-    banner.innerHTML = `<b>${esc(game.seats[at.player])} (${colorOf(at.player)}): turn skipped</b>` +
-      `<div class="sub">Sent ${esc(JSON.stringify(at.sent))}: ${esc(at.refused)}. No stone was placed.</div>`;
+    setBanner('skip', `${game.seats[at.player]} (${colorOf(at.player)}): turn skipped`,
+              `Sent ${JSON.stringify(at.sent)}: ${at.refused}. No stone was placed.`);
   } else if (step >= moves.length && game.status === 'finished') {
     const sc = game.scores || [];
     const best = Math.max(...sc), winners = (game.seats || []).filter((_, i) => sc[i] === best);
-    banner.className = 'banner show';
-    banner.innerHTML = winners.length === 1
-      ? `<b>${esc(winners[0])} takes game ${game.game}</b> with ${fmt(best)} points (${(100 * best / grid / grid).toFixed(1)}% of the board).`
-      : `<b>Game ${game.game} is a tie</b> between ${winners.map(esc).join(' and ')}.`;
     const errs = (game.errors || []).map((e, i) => e ? `${game.seats[i]}: ${e}` : null).filter(Boolean);
-    if (errs.length) banner.innerHTML += `<div class="sub">Forfeit: ${esc(errs.join('; '))}</div>`;
+    const which = games.length === 1 ? 'The game' : `Game ${game.game}`;
+    setBanner('', winners.length === 1
+        ? (games.length === 1 ? `${winners[0]} wins` : `${winners[0]} takes game ${game.game}`)
+        : `${which} is a tie between ${winners.join(' and ')}`,
+      (winners.length === 1 ? `${fmt(best)} points, ${(100 * best / grid / grid).toFixed(1)}% of the board.` : '') +
+      (errs.length ? ` Forfeit: ${errs.join('; ')}` : ''));
+  } else if (at) {
+    const what = at.stone ? `placed a stone at (${at.stone.x}, ${at.stone.y}), weight ${at.stone.weight}`
+                          : `made no move (forfeited: ${at.forfeit || 'no reply'})`;
+    setBanner('idle', `Turn ${step} of ${moves.length}`, `${game.seats[at.player]} (${colorOf(at.player)}) ${what}.`);
   } else {
-    banner.className = 'banner';
+    setBanner('idle', `Game ${game.game}: start`, `${game.seats[0]} (${colorOf(0)}) moves first.`);
   }
 
   $('scrub').max = moves.length;
@@ -413,12 +449,19 @@ function drawMoves(game, moves) {
     box.appendChild(row);
   });
   const here = box.querySelector('.here');
-  if (here) here.scrollIntoView({block: 'nearest'});
+  // Keep the current turn visible by scrolling the turn list only. (scrollIntoView would also
+  // scroll the page, which made the whole view jump on every step.)
+  if (here) {
+    if (here.offsetTop < box.scrollTop) box.scrollTop = here.offsetTop;
+    else if (here.offsetTop + here.offsetHeight > box.scrollTop + box.clientHeight)
+      box.scrollTop = here.offsetTop + here.offsetHeight - box.clientHeight;
+  }
 }
 
 function drawFinal() {
   const s = state.summary;
-  if (!s) { $('final').innerHTML = ''; return; }
+  // One game: the scoreboard above already is the result, so there are no totals to add up.
+  if (!s || (state.games || []).length === 1) { $('final').innerHTML = ''; return; }
   const names = Object.keys(s.totals || {}).sort((a, b) => s.totals[b] - s.totals[a]);
   $('final').innerHTML = `<div style="color:var(--dim);font-size:12px">Totals over all ${(s.games || []).length} games</div>` +
     names.map(n => `<div>${n === s.winner ? '<b style="color:var(--gold)">' : ''}${esc(n)}: ${fmt(s.totals[n])}` +
@@ -457,6 +500,7 @@ function renderLive(s) {
   const P = s.params || {};
   const k = (s.seats || []).length;
   state = {colors: null};
+  seatColors = s.colors || null;
   $('meta').textContent = `${s.names.length} players · ${P.stones} stones and ${P.weight} weight each`;
   $('games').innerHTML = '';
   const last = n.stones[n.stones.length - 1];
@@ -470,26 +514,52 @@ function renderLive(s) {
   // A skip is shown in the banner until the next stone lands.
   const notes = n.notes || [];
   const lastNote = notes[notes.length - 1] || '';
-  const banner = $('banner');
   if (lastNote.startsWith('SKIPPED') || lastNote.startsWith('FORFEIT')) {
-    banner.className = 'banner show skip';
-    banner.innerHTML = `<b>${lastNote.startsWith('SKIPPED') ? 'Turn skipped' : 'Forfeit'}</b><div class="sub">${esc(lastNote)}</div>`;
-  } else { banner.className = 'banner'; }
+    setBanner('skip', lastNote.startsWith('SKIPPED') ? 'Turn skipped' : 'Forfeit', lastNote);
+  } else if (n.done) {
+    setBanner('idle', `Game ${s.game} finished`, 'Next game starting...');
+  } else {
+    const who = (s.seats || [])[n.turn];
+    setBanner('idle', `Turn ${n.turns_done + 1} of ${n.total_turns}`, who ? `${who} (${colorOf(n.turn)}) to play.` : '');
+  }
   drawNotes(notes);
 }
 
+// The title goes home: the dashboard serving this page, or, for a replay file opened straight
+// from disk, the dashboard at its usual address (if it is running).
+if (location.protocol === 'file:') $('home').href = 'http://127.0.0.1:8093/';
+
 if (DATA) {
   state = DATA;
-  gameIx = 0;
-  step = ((state.games[0] || {}).moves || []).length;
+  // ?game=N opens that game's tab; the live page uses it to land on the game that just ended.
+  const want = parseInt(new URLSearchParams(location.search).get('game'), 10);
+  gameIx = want >= 1 && want <= state.games.length ? want - 1 : 0;
+  step = ((state.games[gameIx] || {}).moves || []).length;
   render();
 } else {
   $('controls').style.display = 'none';
   $('movescard').style.display = 'none';
+  // When a match we watched being played finishes, go to its replay, open on its last game.
+  // Only for a tournament of a single match: with several, the page stays put so you can
+  // watch the rest. A match that was already over when this page loaded does not count, so
+  // opening the dashboard later never bounces you away.
+  const watched = new Set();
+  let leaving = false;
   const poll = async () => {
+    if (leaving) return;
     try {
       const r = await fetch('/state');
-      renderLive(await r.json());
+      const s = await r.json();
+      if (s.match_no && !s.replay) watched.add(s.match_no);
+      if (s.replay && s.run_size === 1 && watched.has(s.match_no)) {
+        leaving = true;
+        $('status').textContent = 'Match over. Opening the replay...';
+        setTimeout(() => {
+          window.top.location.href = `${s.replay}?game=${(s.games || []).length || 1}`;
+        }, 1500);
+        return;
+      }
+      renderLive(s);
     } catch (e) { /* the server may be busy between matches */ }
   };
   $('rings').onchange = () => { lastKey = ''; poll(); };

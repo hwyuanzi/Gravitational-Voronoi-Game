@@ -76,7 +76,7 @@ To give a bot a nicer name or a different command, list it in `bots.local.json` 
 ## The rules the referee enforces
 
 **Placing stones.** Each player has the same number of stones and the same total weight, from
-the parameter file. Player 1 (red) places a stone, then player 2 (blue), and so on, until every
+the parameter file. Player 1 places a stone, then player 2, and so on, until every
 player has had one turn per stone, so the last stone is placed by the last player. A stone is
 legal when:
 
@@ -108,6 +108,11 @@ by point against exact fractions.
 bot's score is its territory over both games added together, as the spec says. A melee does the
 same with more bots: one game per bot, the seating rotating so every bot sits in every seat
 exactly once (including the last seat, which places the last stone). The highest total wins.
+A match can instead be set to **one game** (on its dashboard row, or `--one-game` on the
+command line): the bots play once, in the order listed, so the first bot moves first, and the
+score is that game's territory. Use it for quick tests; it is not the spec's scoring.
+Each bot keeps one colour for the whole match, whichever seat it is in: the first bot named
+is red, the second blue, and so on, so you can follow a bot from game to game.
 
 **Clocks and failure.** Each bot has 120 seconds of thinking time for a whole game (set on the
 dashboard or with `--clock`), counted only while the referee waits for its answer. The
@@ -138,6 +143,11 @@ the board, weight left and clock, and whose turn it is. Tick **show the no-go zo
 66-point circle around each stone. Hover over the board to read the coordinates and owner of
 any point. The **watching pace** lingers a few hundred milliseconds per move so a game is
 watchable; it never counts against the bots' clocks and can be changed while a game runs.
+
+When the tournament is a single match and you watched it finish, the page jumps to its
+replay, opened on the game that just ended. With several matches it stays on the dashboard,
+and the replays are linked from the results table. Click the **Gravitational Voronoi** title at the top left of any board or replay
+page to get back to the dashboard.
 
 Finished matches go into the results table with each game's scores in seat order, the totals,
 the winner and margin, and links to the **replay** and the **log**. Replays are self-contained
@@ -211,6 +221,7 @@ stone is refused and the turn skipped.
 ```sh
 python3 start.py match "Greedy (Python)" "Spread (Python)"           # one pairing, opens the replay
 python3 start.py match "A" "B" "C" --config params/s20_w1000.txt     # a three-bot melee
+python3 start.py match "A" "B" --one-game                            # one game, A moves first
 python3 start.py tournament                                          # every pair, no browser
 python3 start.py tournament --melee                                  # one melee of every bot
 python3 start.py params --stones 10 --weight 100 --out params/my_game.txt
